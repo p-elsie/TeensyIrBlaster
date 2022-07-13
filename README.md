@@ -1,2 +1,2 @@
 # TeensyIrBlaster
-A Teensy based IR Blaster - for a specific use case. 
+A flexible Teensy based IR Blaster. 

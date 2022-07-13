@@ -1,6 +1,10 @@
 #include <IRremote.h>
 IRsend irsend;
 
+// This code will work for Teensy 2.0 board (Transmit Pin 10). Also "Leonardo" or "Arduino/Genuino Micro" or "Pro Micro" board (pin 9 for Pro Micro). 
+// See https://www.pjrc.com/teensy/td_libs_IRremote.html
+// See also https://www.arduino.cc/reference/en/libraries/irremote/
+
 //Lirc codes for Dish Network
 //power_on 1
 //up       26
@@ -29,88 +33,84 @@ IRsend irsend;
 void setup()
 {
   Serial.begin(9600);
+  delay(100);
+  Serial.print("Ready");
 }
 
 void loop() {
-  int inByte = Serial.read();
-  switch (inByte) {
-    case 0x61:
-      //user sent 'a'. we toggle power on LG TV
-      irsend.sendNEC(0x20DF10EF, 32);
-      //Serial.println("toggle power - LG TV");
-      break;
-    case 0x62:
-      //user sent 'b'. we toggle power on Samsung TV
-      irsend.sendSAMSUNG(0xE0E040BF, 32);
-      //Serial.println("toggle power - Samsung TV");
-      break;
-    case 0x70:
-      //user sent 'p' so we send the power_on command
-      send4(1);
-      //Serial.println("power on - Dish");
-      break;
-    case 0x73:
-      // 's' means 'select'
-      send4(16);
-      //Serial.println("select");
-      break;
-    case 0x75:
-      // 'u' means 'up'
-      send4(26);
-      //Serial.println("up");
-      break;
-    case 0x30:
-      // '0' button
-      send4(17);
-      //Serial.println("zero");
-      break;
-    case 0x31:
-      // '1' button
-      send4(4);
-      break;
-    case 0x32:
-      // '2' button
-      send4(5);
-      break;
-    case 0x33:
-      // '3' button
-      send4(6);
-      break;
-    case 0x34:
-      // '4' button
-      send4(8);
-      break;
-    case 0x35:
-      // '5' button
-      send4(9);
-      break;
-    case 0x36:
-      // '6' button
-      send4(10);
-      break;
-    case 0x37:
-      // '7' button
-      send4(12);
-      break;
-    case 0x38:
-      // '8' button
-      send4(13);
-      break;
-    case 0x39:
-      // '9' button
-      send4(14);
-      break;
+  // if there's any serial available, read it:
+  while (Serial.available() > 0) {
+
+    // look for the next valid integer in the incoming serial stream:
+    long type = Serial.parseInt();
+    // do it again:
+    unsigned long data = Serial.parseInt();
+    // do it again:
+    unsigned long len = Serial.parseInt();
+
+    // user input must be decimal. The two numbers can be separated with spaces and/or commas. 
+    // for example, to send NEC code 0x04fb83, send "0,326531,16"
+
+    // look for the newline. That's the end of your sentence:
+    if (Serial.read() == '\n') 
+    {
+      // print the numbers in one string as hexadecimal:
+      Serial.print(type, HEX);
+      Serial.print(", ");
+      Serial.print(data, HEX);
+      Serial.print(", ");
+      Serial.println(len, HEX);
+
+      switch (type) {
+          case 0:
+            irsend.sendNEC(data, 32);
+            for (int i=0;i<len;i++)
+            {
+              delay(100);
+              irsend.sendNEC(REPEAT, 32);
+            }
+            break;                        
+          case 3:
+            for (int i=0;i<3;i++)
+            {
+              irsend.sendSAMSUNG(data, len);
+            }
+            break;
+          case 4:
+            for (int i=0;i<3;i++)
+            {
+              irsend.sendSony(data, len);
+            }
+            break;
+          case 5:            
+            for (int i=0;i<3;i++)
+            {
+              delay(100);
+              irsend.sendRC5(data, len);
+            }
+            break;
+          case 6:
+            for (int i=0;i<3;i++)
+            {
+              delay(100);
+              irsend.sendRC6(data, len);
+            }
+          default:
+            // if nothing else matches, do the default
+            // default is optional
+            send4(data);
+          break;
+        }
+    }
   }
-  delay(50);
 }
 
 
+// DISH remote always sends the same code 4 times
 void send4(long code) {
-  int unit = 0x240; //remote has 'unit code' 10
-  code <<= 10;
-  long data = code | unit; 
   for (int i = 0; i < 4; i++) {
-    irsend.sendDISH(data, 16);
+    irsend.sendDISH(code, 16); //sendDISH always leaves the LED on, that's curious, but inconsequential
+    //delay(10);
   }
 }
   
